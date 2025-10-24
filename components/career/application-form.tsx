@@ -105,38 +105,34 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
     setIsSubmitting(true);
     setSubmitStatus("idle");
 
-    // Simulate API call
     try {
-      // In a real application, you would send this to your backend API
+      // Prepare FormData for submission
       const formDataToSend = new FormData();
-      formDataToSend.append("jobId", jobId);
-      formDataToSend.append("jobTitle", jobTitle);
       formDataToSend.append("fullName", formData.fullName);
       formDataToSend.append("email", formData.email);
       formDataToSend.append("phone", formData.phone);
-      formDataToSend.append("linkedIn", formData.linkedIn);
-      formDataToSend.append("portfolioUrl", formData.portfolioUrl);
-      formDataToSend.append("coverLetter", formData.coverLetter);
-      formDataToSend.append("yearsOfExperience", formData.yearsOfExperience);
       if (resumeFile) {
-        formDataToSend.append("resume", resumeFile);
+        formDataToSend.append("cvFile", resumeFile);
       }
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // For now, just log the data (in production, send to your API)
-      console.log("Application submitted:", {
-        ...formData,
-        resumeFileName: resumeFile?.name,
-        jobId,
-        jobTitle,
+      // Submit to API
+      const response = await fetch("/api/applications/submit", {
+        method: "POST",
+        body: formDataToSend,
       });
 
-      setSubmitStatus("success");
+      const result = await response.json();
+
+      if (result.success) {
+        setSubmitStatus("success");
+      } else {
+        setSubmitStatus("error");
+        setErrors({ submit: result.message || "Failed to submit application" });
+      }
     } catch (error) {
       console.error("Error submitting application:", error);
       setSubmitStatus("error");
+      setErrors({ submit: "An error occurred. Please try again." });
     } finally {
       setIsSubmitting(false);
     }

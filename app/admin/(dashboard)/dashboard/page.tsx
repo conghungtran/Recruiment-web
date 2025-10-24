@@ -9,12 +9,13 @@ import {
   TrendingUp,
   Users,
   Eye,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react";
-import { jobs } from "@/data/careers";
+import { useJobs } from "@/hooks/use-jobs";
+import { useApplications } from "@/hooks/use-applications";
 import { newsArticles } from "@/data/news";
 import { testimonials } from "@/data/testimonials";
-import { jobApplications } from "@/data/applications";
 import { motion } from "framer-motion";
 
 const containerVariants = {
@@ -37,6 +38,9 @@ const itemVariants = {
 };
 
 export default function AdminDashboard() {
+  const { jobs, loading: jobsLoading } = useJobs();
+  const { applications, loading: appsLoading } = useApplications();
+
   const stats = [
     {
       title: "Total News",
@@ -48,17 +52,17 @@ export default function AdminDashboard() {
     },
     {
       title: "Job Openings",
-      value: jobs.length,
+      value: jobsLoading ? "..." : jobs.length,
       icon: Briefcase,
-      description: `${jobs.filter(j => j.featured).length} featured`,
+      description: jobsLoading ? "Loading..." : `${jobs.filter(j => j.featured).length} featured`,
       color: "text-green-600",
       bgColor: "bg-green-50",
     },
     {
       title: "Applications",
-      value: jobApplications.length,
+      value: appsLoading ? "..." : applications.length,
       icon: FileText,
-      description: `${jobApplications.filter(a => a.status === "pending").length} pending review`,
+      description: appsLoading ? "Loading..." : `${applications.filter(a => a.status === null).length} pending review`,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
     },
@@ -72,7 +76,7 @@ export default function AdminDashboard() {
     },
   ];
 
-  const recentApplications = jobApplications.slice(0, 5);
+  const recentApplications = applications.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -131,38 +135,44 @@ export default function AdminDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentApplications.map((application) => (
-                  <div
-                    key={application.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{application.fullName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {application.jobTitle}
-                      </p>
+              {appsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : recentApplications.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No applications yet
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentApplications.map((application) => (
+                    <div
+                      key={application.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{application.fullName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {application.email}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            application.status === null
+                              ? "bg-yellow-100 text-yellow-800"
+                              : application.status === 1
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {application.status === null ? "Pending" : application.status === 1 ? "Approved" : "Rejected"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          application.status === "pending"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : application.status === "reviewing"
-                            ? "bg-blue-100 text-blue-800"
-                            : application.status === "interviewed"
-                            ? "bg-purple-100 text-purple-800"
-                            : application.status === "accepted"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {application.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
