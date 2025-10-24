@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -13,13 +13,37 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Edit, Trash2, Eye, MapPin, Briefcase } from "lucide-react";
-import { jobs } from "@/data/careers";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Search, Edit, Trash2, Eye, MapPin, Briefcase, Loader2 } from "lucide-react";
+import { useJobs, type Job } from "@/hooks/use-jobs";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 export default function JobsManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { jobs, loading, error } = useJobs();
+  const { toast } = useToast();
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredJobs = jobs.filter(
     (job) =>
@@ -27,6 +51,44 @@ export default function JobsManagementPage() {
       job.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/jobs/${jobToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Success!",
+          description: "Job deleted successfully.",
+        });
+        // Refresh the page to get updated jobs list
+        window.location.reload();
+      } else {
+        toast({
+          title: "Error!",
+          description: result.message || "Failed to delete job.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      toast({
+        title: "Error!",
+        description: "An error occurred while deleting the job.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setJobToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -71,6 +133,15 @@ export default function JobsManagementPage() {
       >
         <Card>
           <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-8 text-destructive">
+                <p>{error}</p>
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -122,17 +193,26 @@ export default function JobsManagementPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Link href={`/career/${job.slug}`} target="_blank">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedJob(job)}
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
                           <Link href={`/admin/jobs/${job.id}/edit`}>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" title="Edit Job">
                               <Edit className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Button variant="ghost" size="sm" className="text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => setJobToDelete(job)}
+                            title="Delete Job"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -142,6 +222,7 @@ export default function JobsManagementPage() {
                 )}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -187,6 +268,107 @@ export default function JobsManagementPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* View Job Dialog */}
+      <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedJob && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedJob.title}</DialogTitle>
+                <DialogDescription>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Badge variant="outline">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {selectedJob.location}
+                    </Badge>
+                    <Badge variant="outline">
+                      <Briefcase className="w-3 h-3 mr-1" />
+                      {selectedJob.department}
+                    </Badge>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 py-4">
+                {selectedJob.description && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">Description</h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {selectedJob.description}
+                    </p>
+                  </div>
+                )}
+
+                {selectedJob.requirements && selectedJob.requirements.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">Requirements</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                      {selectedJob.requirements.map((req, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2">Benefits</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                      {selectedJob.benefits.map((benefit, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">
+                          {benefit}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedJob(null)}>
+                  Close
+                </Button>
+                <Link href={`/career/${selectedJob.id}`} target="_blank">
+                  <Button>View on Career Page</Button>
+                </Link>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => !open && setJobToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the job posting for{" "}
+              <strong>{jobToDelete?.title}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteJob}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

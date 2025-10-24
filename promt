@@ -1,0 +1,8 @@
+Tôi đang làm dự án automation tuyển dụng nhân lực với n8n. Hãy đọc source code của project này "./", tôi muốn source code này là front-end. Đọc source code của project "~/coding/web/job-recruitment-backend/", tôi muốn source code đó là back-end. Hãy sửa lại theo nội dung sau:
+1. Đăng bài tuyển dụng
+
+
+
+
+Tôi đang làm dự án automation tuyển dụng nhân lực với n8n. Hãy đọc source code của project này "./", tôi muốn source code này là front-end. Đọc source code của project "~/coding/web/job-recruitment-backend/", tôi muốn source code đó là back-end. Hãy sửa lại theo nội dung sau:
+- Hãy thêm chức năng "Create Job" ở front-end (/admin/jobs/create), đồng thời lưu dữ liệu ở back-end vào trong database

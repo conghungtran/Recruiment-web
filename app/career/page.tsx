@@ -6,10 +6,10 @@ import {
   ArrowRight, MapPin, Briefcase, Search, Send, Filter,
   Target, Users, Zap, Heart, Star, Quote, Clock,
   DollarSign, GraduationCap, Home, Plane, Laptop,
-  FileCheck, Video, CheckCircle, Sparkles, Mail
+  FileCheck, Video, CheckCircle, Sparkles, Mail, Loader2
 } from "lucide-react";
 import Link from "next/link";
-import { jobs } from "@/data/careers";
+import { useJobs } from "@/hooks/use-jobs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ const itemVariants = {
 const ITEMS_PER_PAGE = 6;
 
 export default function CareerPage() {
+  const { jobs, loading, error } = useJobs();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
@@ -69,11 +70,11 @@ export default function CareerPage() {
   // Get unique departments and locations
   const departments = useMemo(() => {
     return ["all", ...Array.from(new Set(jobs.map((j) => j.department)))];
-  }, []);
+  }, [jobs]);
 
   const locations = useMemo(() => {
     return ["all", ...Array.from(new Set(jobs.map((j) => j.location)))];
-  }, []);
+  }, [jobs]);
 
   // Filter jobs
   const filteredJobs = useMemo(() => {
@@ -92,7 +93,7 @@ export default function CareerPage() {
 
       return matchesSearch && matchesDepartment && matchesLocation;
     });
-  }, [searchTerm, selectedDepartment, selectedLocation]);
+  }, [jobs, searchTerm, selectedDepartment, selectedLocation]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -574,7 +575,15 @@ export default function CareerPage() {
       {/* Job Listings Section */}
       <section className="py-16 lg:py-24">
         <div className="container mx-auto px-4 lg:px-8">
-          {filteredJobs.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-12 h-12 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-16">
+              <p className="text-lg text-destructive">{error}</p>
+            </div>
+          ) : filteredJobs.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -690,7 +699,7 @@ export default function CareerPage() {
                               Apply Now
                             </Button>
                             <Link
-                              href={`/career/${job.slug}`}
+                              href={`/career/${job.id}`}
                               className="inline-flex items-center gap-2 text-sm font-medium text-primary whitespace-nowrap group/btn hover:gap-3 transition-all"
                             >
                               <span>Details</span>

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Briefcase, CheckCircle, Mail, ExternalLink, Building2 } from "lucide-react";
-import { getJobBySlug, getAllJobSlugs } from "@/data/careers";
+import { ArrowLeft, MapPin, Briefcase, CheckCircle, Mail, ExternalLink, Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -16,19 +15,70 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import ApplicationForm from "@/components/career/application-form";
+import type { Job } from "@/hooks/use-jobs";
 
 export default function JobDetailPage() {
   const params = useParams();
-  const slug = params.slug as string;
-  const job = getJobBySlug(slug);
+  const id = params.id as string;
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isApplicationOpen, setIsApplicationOpen] = useState(false);
 
-  if (!job) {
+  useEffect(() => {
+    async function fetchJob() {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/jobs/${id}`);
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          // Transform API data to Job format
+          const apiJob = data.data;
+          const jobTitle = (apiJob.job_title || "").trim();
+          const transformedJob: Job = {
+            id: apiJob.id.toString(),
+            slug: jobTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+            title: jobTitle,
+            location: (apiJob.location || "").trim(),
+            department: (apiJob.job_type || "General").trim(),
+            shortDescription: apiJob.description ? apiJob.description.substring(0, 150) + "..." : "",
+            description: apiJob.description || "",
+            requirements: apiJob.requirements ? apiJob.requirements.split(/\n|,/).map((r: string) => r.trim()).filter(Boolean) : [],
+            benefits: apiJob.benefits ? apiJob.benefits.split(/\n|,/).map((b: string) => b.trim()).filter(Boolean) : [],
+            featured: false,
+          };
+          setJob(transformedJob);
+        } else {
+          setError("Job not found");
+        }
+      } catch (err) {
+        console.error("Error fetching job:", err);
+        setError("Failed to load job details");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (id) {
+      fetchJob();
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !job) {
     return (
       <div className="min-h-screen pt-24 pb-16 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4">Job Not Found</h1>
-          <p className="text-muted-foreground mb-8">The position you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-8">{error || "The position you're looking for doesn't exist."}</p>
           <Button asChild>
             <Link href="/career">
               <ArrowLeft className="mr-2 w-4 h-4" />
