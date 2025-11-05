@@ -6,3 +6,8 @@ Tôi đang làm dự án automation tuyển dụng nhân lực với n8n. Hãy �
 
 Tôi đang làm dự án automation tuyển dụng nhân lực với n8n. Hãy đọc source code của project này "./", tôi muốn source code này là front-end. Đọc source code của project "~/coding/web/job-recruitment-backend/", tôi muốn source code đó là back-end. Hãy sửa lại theo nội dung sau:
 - Hãy thêm chức năng "Create Job" ở front-end (/admin/jobs/create), đồng thời lưu dữ liệu ở back-end vào trong database
+
+
+
+Ở bước 8. Frontend polls: GET /api/cv/:id/processing-status. n8n trả lại kết quả quiz cho backend thông qua API nào, hãy cho tôi 1 ví dụ dùng curl sau
+khi n8n chấm quiz và trả lại result cho back-end

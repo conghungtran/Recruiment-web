@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ interface ApplicationFormProps {
 }
 
 export default function ApplicationForm({ jobTitle, jobId, onClose }: ApplicationFormProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -30,6 +32,7 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [cvId, setCvId] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -111,6 +114,7 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
       formDataToSend.append("fullName", formData.fullName);
       formDataToSend.append("email", formData.email);
       formDataToSend.append("phone", formData.phone);
+      formDataToSend.append("jobId", jobId);
       if (resumeFile) {
         formDataToSend.append("cvFile", resumeFile);
       }
@@ -125,6 +129,14 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
 
       if (result.success) {
         setSubmitStatus("success");
+        // Store CV ID for redirect
+        if (result.data?.id) {
+          setCvId(result.data.id.toString());
+          // Redirect to processing page after 2 seconds
+          setTimeout(() => {
+            router.push(`/cv-processing/${result.data.id}`);
+          }, 2000);
+        }
       } else {
         setSubmitStatus("error");
         setErrors({ submit: result.message || "Failed to submit application" });
@@ -150,14 +162,12 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
         </div>
         <h3 className="text-2xl font-bold mb-2 text-foreground">Application Submitted!</h3>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          Thank you for applying for the {jobTitle} position. We've received your application and will review it shortly.
-          You'll hear from us within 5-7 business days.
+          Thank you for applying for the {jobTitle} position. We're now processing your CV...
         </p>
-        {onClose && (
-          <Button onClick={onClose} variant="outline">
-            Close
-          </Button>
-        )}
+        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <p className="text-sm">Redirecting to processing page...</p>
+        </div>
       </motion.div>
     );
   }

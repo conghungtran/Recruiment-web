@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
 
-    // Forward to backend
+    // Forward to backend (formData already includes jobId if provided)
     const response = await fetch(`${BACKEND_URL}/api/upload-cv`, {
       method: "POST",
       body: formData,

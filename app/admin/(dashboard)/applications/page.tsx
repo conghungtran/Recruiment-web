@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -35,8 +35,10 @@ import {
   GraduationCap,
   Award,
   Target,
+  RefreshCcw,
 } from 'lucide-react';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
 // Extended Data Model
 interface JobApplication {
   id: string;
@@ -72,52 +74,130 @@ interface JobApplication {
   avatar?: string;
 }
 
-// Mock data generator
-const generateMockApplications = (): JobApplication[] => {
-  const names = ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E', 'Võ Thị F', 'Đặng Văn G', 'Bùi Thị H'];
-  const positions = ['Senior Frontend Developer', 'Backend Engineer', 'Full Stack Developer', 'DevOps Engineer', 'UI/UX Designer', 'Product Manager', 'QA Engineer', 'Data Analyst'];
-  const departments = ['Engineering', 'Design', 'Product', 'QA'];
-  const statuses: JobApplication['status'][] = ['new', 'reviewed', 'interview', 'offer', 'hired', 'rejected'];
-  const pipelines: JobApplication['pipeline'][] = ['new', 'screening', 'shortlisted', 'interview', 'offer', 'hired', 'rejected'];
-  const priorities: JobApplication['priority'][] = ['low', 'medium', 'high', 'urgent'];
-  const sources: JobApplication['source'][] = ['website', 'linkedin', 'referral', 'agency', 'direct'];
-  const skills = ['React', 'TypeScript', 'Node.js', 'Python', 'AWS', 'Docker', 'Kubernetes', 'GraphQL', 'MongoDB', 'PostgreSQL'];
-  
-  return Array.from({ length: 24 }, (_, i) => ({
-    id: `app-${i + 1}`,
-    name: names[i % names.length],
-    email: `candidate${i + 1}@email.com`,
-    phone: `+84${Math.floor(Math.random() * 1000000000)}`,
-    position: positions[i % positions.length],
-    department: departments[i % departments.length],
-    status: statuses[i % statuses.length],
-    pipeline: pipelines[i % pipelines.length],
-    priority: priorities[i % priorities.length],
-    source: sources[i % sources.length],
-    assignedTo: i % 3 === 0 ? 'HR Manager' : i % 3 === 1 ? 'Tech Lead' : 'CEO',
-    rating: Math.floor(Math.random() * 5) + 1,
-    tags: skills.slice(0, Math.floor(Math.random() * 4) + 2),
-    resumeUrl: `/resumes/candidate${i + 1}.pdf`,
-    linkedinUrl: `https://linkedin.com/in/candidate${i + 1}`,
-    githubUrl: i % 2 === 0 ? `https://github.com/candidate${i + 1}` : undefined,
-    appliedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-    lastUpdated: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-    interviewDate: i % 3 === 0 ? new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : undefined,
-    interviewType: i % 3 === 0 ? ['phone', 'video', 'onsite', 'technical'][Math.floor(Math.random() * 4)] as any : undefined,
-    notes: i % 2 === 0 ? 'Strong technical background. Good communication skills.' : undefined,
-    experience: Math.floor(Math.random() * 10) + 1,
-    expectedSalary: Math.floor(Math.random() * 2000 + 1000) * 1000,
-    offeredSalary: i % 4 === 0 ? Math.floor(Math.random() * 2000 + 1200) * 1000 : undefined,
-    skills: skills.slice(0, Math.floor(Math.random() * 6) + 3),
-    education: ['Bachelor', 'Master', 'PhD'][Math.floor(Math.random() * 3)] + ' in Computer Science',
-    location: ['Hà Nội', 'TP.HCM', 'Đà Nẵng'][i % 3],
-    availability: ['Immediate', '2 weeks notice', '1 month notice'][i % 3],
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`,
-  }));
-};
+// Fetch jobs map (job_id -> job_title)
+async function fetchJobsMap(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`/api/jobs?pageSize=1000`, { cache: 'no-store' });
+    const json = await res.json();
+    const items: any[] = json.items || [];
+    const map: Record<string, string> = {};
+    for (const it of items) {
+      const id = String(it.id ?? it.job_id ?? '');
+      if (!id) continue;
+      const title = (it.job_title ?? it.title ?? '').toString().trim();
+      if (title) map[id] = title;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Fetch admin applications
+async function fetchAdminApplications(): Promise<JobApplication[]> {
+  const [appsRes, jobsMap] = await Promise.all([
+    fetch(`/api/admin/applications?pageSize=200`, { cache: 'no-store' }).then(r => r.json()),
+    fetchJobsMap(),
+  ]);
+  const items: any[] = appsRes.items || [];
+  return items.map((it, i) => {
+    const cvStatus: string | undefined = it.cv_status ?? (typeof it.status === 'number' ? (it.status === 1 ? 'approved' : 'rejected') : undefined);
+    const pipeline = pipelineFromCvStatus(cvStatus);
+    const status = statusFromCvStatus(cvStatus);
+    const name = it.fullName || it.name || 'Unknown';
+    const email = it.email || '';
+    const phone = it.phone || '';
+    const jobIdRaw = it.job_id ?? it.jobId;
+    const jobId = jobIdRaw != null ? String(jobIdRaw) : '';
+    const jobTitleFromMap = jobId ? jobsMap[jobId] : undefined;
+    const rawTitle = (it.job_title || jobTitleFromMap || (jobId ? `Job #${jobId}` : 'N/A')).toString().trim();
+    const lowered = rawTitle.toLowerCase();
+    const cats: string[] = [];
+    if (/full\s*stack|fullstack/.test(lowered)) cats.push('Fullstack');
+    if (/(front[-\s]?end|frontend)/.test(lowered)) cats.push('Front-End');
+    if (/(back[-\s]?end|backend)/.test(lowered)) cats.push('Back-End');
+    if (/mobile|android|ios|react\s*native|flutter/.test(lowered)) cats.push('Mobile');
+    const position = cats.length ? cats.join(', ') : rawTitle;
+    const appliedAt = it.uploadedAt || it.created_at || new Date().toISOString();
+    const resumeStored = it.path || it.storedName || it.file?.storedName || it.cv_path;
+    const resumeUrl = resumeStored ? `${BACKEND_URL}/uploads/${resumeStored}` : undefined;
+
+    return {
+      id: String(it.id ?? i),
+      name,
+      email,
+      phone,
+      position,
+      department: '—',
+      status,
+      pipeline,
+      priority: 'medium',
+      source: 'website',
+      assignedTo: undefined,
+      rating: undefined,
+      tags: undefined,
+      resumeUrl,
+      coverLetterUrl: undefined,
+      portfolioUrl: undefined,
+      linkedinUrl: undefined,
+      githubUrl: undefined,
+      appliedDate: appliedAt,
+      lastUpdated: appliedAt,
+      interviewDate: undefined,
+      interviewType: undefined,
+      notes: undefined,
+      experience: undefined,
+      expectedSalary: undefined,
+      offeredSalary: undefined,
+      skills: undefined,
+      education: undefined,
+      location: undefined,
+      availability: undefined,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+    } as JobApplication;
+  });
+}
+
+function pipelineFromCvStatus(s?: string): JobApplication['pipeline'] {
+  switch ((s || '').toLowerCase()) {
+    case 'checking':
+      return 'screening';
+    case 'approved':
+      return 'shortlisted';
+    case 'quiz_ready':
+    case 'quiz_completed':
+      return 'interview';
+    case 'quiz_passed':
+      return 'offer';
+    case 'quiz_failed':
+    case 'rejected':
+      return 'rejected';
+    default:
+      return 'new';
+  }
+}
+
+function statusFromCvStatus(s?: string): JobApplication['status'] {
+  switch ((s || '').toLowerCase()) {
+    case 'checking':
+      return 'new';
+    case 'approved':
+    case 'quiz_ready':
+      return 'reviewed';
+    case 'quiz_completed':
+      return 'interview';
+    case 'quiz_passed':
+      return 'offer';
+    case 'quiz_failed':
+    case 'rejected':
+      return 'rejected';
+    default:
+      return 'new';
+  }
+}
 
 const ApplicationsPage = () => {
-  const [applications, setApplications] = useState<JobApplication[]>(generateMockApplications());
+  const [applications, setApplications] = useState<JobApplication[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('all');
@@ -135,6 +215,24 @@ const ApplicationsPage = () => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 3000);
   };
+
+  // Load from API
+  const load = async () => {
+    setIsLoading(true);
+    try {
+      const list = await fetchAdminApplications();
+      setApplications(list);
+      showNotification('success', 'Applications synced');
+    } catch (e) {
+      showNotification('error', 'Failed to load applications');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
 
   // Filter and search logic
   const filteredApplications = useMemo(() => {
@@ -267,14 +365,24 @@ const ApplicationsPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Applications Management</h1>
           <p className="text-gray-600 mt-1">Track and manage recruitment pipeline</p>
         </div>
-        <button
-          onClick={handleAIFilter}
-          disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50"
-        >
-          <Zap className="w-4 h-4" />
-          AI Filter New CVs
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={load}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Reload
+          </button>
+          <button
+            onClick={handleAIFilter}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50"
+          >
+            <Zap className="w-4 h-4" />
+            AI Filter New CVs
+          </button>
+        </div>
       </div>
 
       {/* Statistics */}
