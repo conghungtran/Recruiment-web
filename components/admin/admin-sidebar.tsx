@@ -42,6 +42,11 @@ const menuItems = [
     icon: FileText,
   },
   {
+    title: "Pipeline",
+    href: "/admin/applications/board",
+    icon: FileText,
+  },
+  {
     title: "Testimonials",
     href: "/admin/testimonials",
     icon: MessageSquare,

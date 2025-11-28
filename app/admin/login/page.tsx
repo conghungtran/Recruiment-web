@@ -6,7 +6,13 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -101,8 +107,8 @@ export default function AdminLoginPage() {
                   Demo Credentials:
                 </p>
                 <p className="text-xs text-center font-mono">
-                  Email: admin@vtech.com<br />
-                  Password: admin123
+                  {/* Email: admin@vtech.com<br /> */}
+                  {/* Password: admin123 */}
                 </p>
               </div>
             </form>
@@ -112,4 +118,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-

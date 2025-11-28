@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
@@ -33,6 +33,30 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cvId, setCvId] = useState<string | null>(null);
+  const [trackingToken, setTrackingToken] = useState<string | null>(null);
+  const [step, setStep] = useState<number>(1);
+  const draftKey = `application_draft_${jobId}`;
+
+  // Load draft
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && d.formData) {
+          setFormData((prev) => ({ ...prev, ...d.formData }));
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Autosave
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ formData }));
+    } catch {}
+  }, [formData, draftKey]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -128,10 +152,12 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
       const result = await response.json();
 
       if (result.success) {
+        try { localStorage.removeItem(draftKey); } catch {}
         setSubmitStatus("success");
         // Store CV ID for redirect
         if (result.data?.id) {
           setCvId(result.data.id.toString());
+          if (result.data?.candidate_token) setTrackingToken(result.data.candidate_token);
           // Redirect to processing page after 2 seconds
           setTimeout(() => {
             router.push(`/cv-processing/${result.data.id}`);
@@ -168,6 +194,9 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
           <Loader2 className="w-4 h-4 animate-spin" />
           <p className="text-sm">Redirecting to processing page...</p>
         </div>
+        {trackingToken && (
+          <p className="text-xs text-muted-foreground mt-4">Mã theo dõi hồ sơ: <code>{trackingToken}</code> (giữ lại để tra cứu trạng thái)</p>
+        )}
       </motion.div>
     );
   }
@@ -176,16 +205,20 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-foreground">Apply for {jobTitle}</h3>
-        <p className="text-sm text-muted-foreground">
-          Fill out the form below to submit your application. Fields marked with * are required.
-        </p>
+        <p className="text-sm text-muted-foreground">Fill out the form below to submit your application. Fields marked with * are required.</p>
+        <div className="flex items-center gap-2 text-sm">
+          {[1,2,3].map((s)=> (
+            <div key={s} className={`flex-1 h-1 rounded ${step>=s? 'bg-primary':'bg-muted'}`}></div>
+          ))}
+        </div>
       </div>
 
-      {/* Personal Information */}
-      <div className="space-y-4">
-        <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">Personal Information</h4>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Step 1: Personal Information */}
+      <AnimatePresence>
+        {step === 1 && (
+          <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-8}} className="space-y-4">
+            <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">Personal Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">
               Full Name <span className="text-destructive">*</span>
@@ -279,10 +312,43 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
             />
           </div>
         </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Resume Upload */}
-      <div className="space-y-2">
+      {/* Step 2: Links & Experience */}
+      <AnimatePresence>
+        {step === 2 && (
+          <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-8}} className="space-y-4">
+            <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">Links & Experience</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="yearsOfExperience">Experience</Label>
+                <Input id="yearsOfExperience" name="yearsOfExperience" value={formData.yearsOfExperience} onChange={handleInputChange} placeholder="e.g., 5 years, 6 months, 2 years 3 months" />
+                <p className="text-xs text-muted-foreground">Enter your relevant work experience (e.g., "2 years", "6 months", "1 year 3 months")</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkedIn">LinkedIn Profile</Label>
+                <Input id="linkedIn" name="linkedIn" value={formData.linkedIn} onChange={handleInputChange} placeholder="https://linkedin.com/in/johndoe" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="portfolioUrl">Portfolio / Website</Label>
+                <Input id="portfolioUrl" name="portfolioUrl" value={formData.portfolioUrl} onChange={handleInputChange} placeholder="https://johndoe.com" />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Step 3: Resume & Cover Letter */}
+      <AnimatePresence>
+        {step === 3 && (
+          <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-8}} className="space-y-4">
+            <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">Resume & Cover Letter</h4>
+            {/* Resume Upload */}
+            <div className="space-y-2">
         <Label htmlFor="resume">
           Resume / CV <span className="text-destructive">*</span>
         </Label>
@@ -334,10 +400,10 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
         {errors.resume && (
           <p className="text-xs text-destructive">{errors.resume}</p>
         )}
-      </div>
+            </div>
 
-      {/* Cover Letter */}
-      <div className="space-y-2">
+            {/* Cover Letter */}
+            <div className="space-y-2">
         <Label htmlFor="coverLetter">
           Cover Letter <span className="text-destructive">*</span>
         </Label>
@@ -358,7 +424,10 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
           )}
           <p className="text-xs text-muted-foreground">{formData.coverLetter.length} characters</p>
         </div>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Submit Error */}
       {submitStatus === "error" && (
@@ -370,26 +439,21 @@ export default function ApplicationForm({ jobTitle, jobId, onClose }: Applicatio
         </div>
       )}
 
-      {/* Submit Button */}
+      {/* Navigation Buttons */}
       <div className="flex gap-3 pt-4">
-        <Button
-          type="submit"
-          className="flex-1"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            "Submit Application"
-          )}
-        </Button>
-        {onClose && (
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+        {step > 1 && (
+          <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(1, s - 1))}>Back</Button>
+        )}
+        {step < 3 && (
+          <Button type="button" onClick={() => setStep((s) => Math.min(3, s + 1))} className="ml-auto">Next</Button>
+        )}
+        {step === 3 && (
+          <Button type="submit" className="ml-auto" disabled={isSubmitting}>
+            {isSubmitting ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</>) : ("Submit Application")}
           </Button>
+        )}
+        {onClose && (
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
         )}
       </div>
     </form>
