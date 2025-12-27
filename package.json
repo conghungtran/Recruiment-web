@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "start:https": "NODE_ENV=production node server-https.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

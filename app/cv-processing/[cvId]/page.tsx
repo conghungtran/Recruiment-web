@@ -21,7 +21,7 @@ interface ProcessingStatus {
   quiz_session: any | null;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://0.0.0.0:8080";
 
 export default function CVProcessingPage() {
   const params = useParams();
